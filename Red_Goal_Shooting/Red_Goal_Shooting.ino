@@ -47,7 +47,7 @@ int state;
 int lastLight = 17;
 
 int temp2;
-
+int temp3;
 double usualSpeed = 125;
 
 const int pingPin = 25;
@@ -55,7 +55,7 @@ unsigned long pulseDuration;
 float distance;
 
 //double x_g_1 = 217;
-double x_g_1 = 217;
+double x_g_1 = 24;
 double y_g_1 = 60;
 double theta = 0;
 bool ballDetected = 0;
@@ -152,16 +152,24 @@ void loop() {
         String y_coord = output.substring(3,6);
         int x = x_coord.toInt();
         int y = y_coord.toInt();
+        if(x == 0 & y == 0){
+          break;
+        }
         theta = atan2(y_g_1 - y, x_g_1 - x) * 180 / 3.1415;
         theta = -1 * theta;
         if(theta < 0){
           theta = theta + 360;
         }
+        Serial.print("x: ");
+        Serial.print(x);
+        Serial.print("y: ");
+        Serial.print(y);
         Serial.print("Theta: ");
         Serial.println(theta);
-        int temp3 = aPID_TURNING2(Kp_t_2, Ki_t_2, Kd_t_2, theta, y);
+        temp3 = aPID_TURNING2(Kp_t_2, Ki_t_2, Kd_t_2, theta, y);
         if (temp3 == 1){
           state = 4;
+          delay(2000);
         } else{
           state = 1;
         }
@@ -177,10 +185,13 @@ void loop() {
       lastLight = 14;
       pixy.ccc.getBlocks();
       if(pixy.ccc.numBlocks){
-        if(pixy.ccc.blocks[0].m_signature != 6){
+        if(pixy.ccc.blocks[0].m_signature != 6 || pixy.ccc.blocks[0].m_width < 70){
           state = 1;
           break;
         }
+      } else{
+        state = 1;
+        break;
       }
       Serial.println("In state 4");
       aPID_STRAIGHT2(Kp_s_2, Ki_s_2, Kd_s_2, theta);
@@ -355,25 +366,30 @@ int aPID_TURNING2(double Kp, double Ki, double Kd, double setpoint, int y) {
       input = euler.x();
       oldTime = now; //update oldTime
       double error = 0;
-      if(y > 60){
-        if(input >= 180 && input < 360){
-          error = setpoint - input + 360;
-        } else{
-          error = setpoint - input;
-        }
-      } else if(y < 60){
-        if(input >= 180 && input < 360){
-          error = setpoint - input;
-        } else{
-          error = -1 * setpoint - input;
-        }
-      } else{
-        if(input >= 180 && input < 360){
-          error = 360 - input;
-        } else{
-          error = -1 * input;
-        }
-      }
+      // if(y < 60){
+      //   if(input >= 180 && input < 360){
+      //     error = input - setpoint ;
+      //   } else{
+      //     error = setpoint - input;
+      //   }
+      // } else if(y > 60){
+      //   if(input >= 180 && input < 360){
+      //     error = input - setpoint;
+      //   } else{
+      //     error = 180 - setpoint - input;
+      //   }
+      // } else{
+      //   if(input >= 180 && input < 360){
+      //     error = input -setpoint;
+      //   } else{
+      //     error = setpoint - input;
+      //   }
+      // }
+      error = setpoint - input;
+      // if(y>60 && input>=180 && input <= 360){
+      //   error = error - 2 * input + 450;
+      // }
+      Serial.println("------------------");
       Serial.print("Setpoint");
       Serial.println(setpoint);
       Serial.print("Input");
@@ -427,6 +443,7 @@ int aPID_TURNING2(double Kp, double Ki, double Kd, double setpoint, int y) {
       // Serial.println(speed);
       motors.setM1Speed(speed); //wheels fed same speed, turn in opposite directions
       motors.setM2Speed(speed);
+      //Serial.println(error);
     }
   }
 }
@@ -452,12 +469,9 @@ void aPID_STRAIGHT2(double Kp, double Ki, double Kd, double setpoint) {
       input = euler.x();
       oldTime = now; //update oldTime
       double error = 0;
-      if (input > 190) { //190 instead of 180 so it doesn't flip flop between 178 and -178
-        input = input - 360;
-      }
-      if (setpoint > 180) {
-        setpoint = setpoint - 360;
-      }
+      // if (input > 190) { //190 instead of 180 so it doesn't flip flop between 178 and -178
+      //   input = input - 360;
+      // }
       error = setpoint - input;
       Serial.print("Setpoint");
       Serial.println(setpoint);
@@ -475,7 +489,8 @@ void aPID_STRAIGHT2(double Kp, double Ki, double Kd, double setpoint) {
         int x = x_coord.toInt();
         int y = y_coord.toInt();
         //if (x > 160){
-        if (x > 195){
+        //x < 30
+        if (x < 30){
           settleCount = millis(); //update the current settle time counter
           //if (settleCount - oldSettleCount >= settleTime) { //if the error has been within the settle threshold for enough time, exit the turning PID
             // stop and exit the function
@@ -492,7 +507,7 @@ void aPID_STRAIGHT2(double Kp, double Ki, double Kd, double setpoint) {
       derivative = (error - old_err) / (rr / 1000.0); //calc deriv
       output = (Kp * error) + (Ki * integral) + (Kd * derivative); //calc output
       old_err = error; //updates old error to current error
-      speedAdjust = constrain(output, -50, 50);
+      speedAdjust = constrain(output, -75, 75);
       // Serial.println(speed);
       motors.setM1Speed(175 + speedAdjust); //wheels fed same speed, turn in opposite directions
       motors.setM2Speed(-1 * 175 + speedAdjust);
